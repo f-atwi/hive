@@ -1,10 +1,7 @@
 [ "$_hive_loaded" ] && return 0
 _hive_loaded=1
 
-[ "$_hive-core_loaded" ] || {
-    echo "hive: hive-core plugin not loaded — run: fly add f-atwi/hive-core" >&2
-    return 1
-}
+[ "$_hive-core_loaded" ] || { _hive_core="${FLY_HOME:-$HOME}/.fly.d/plugins/hive-core/hive-core"; [ -f "$_hive_core" ] && . "$_hive_core" || { echo "hive: hive-core plugin not installed — run: fly add f-atwi/hive-core" >&2; return 1; }; unset _hive_core; }
 
 _hive_usage()
 {
