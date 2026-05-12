@@ -1,6 +1,11 @@
 [ "$_hive_loaded" ] && return 0
 _hive_loaded=1
 
+[ "$_hivecore_loaded" ] || {
+    echo "hive: hivecore plugin not loaded — run: fly add f-atwi/hivecore" >&2
+    return 1
+}
+
 _hive_usage()
 {
     cat - <<'EOF'
@@ -13,90 +18,12 @@ Canonical infrastructure hub — unified Fly transports for LXD, Juju, and Multi
   multipass <vm>         [shell]   Fly shell in a Multipass VM          (requires swarmpass)
   ssh       <host>       [shell]   Fly shell over SSH
 
-  add       <plugin>              Install a plugin via fly add
-  help                             Show this help
+  help                            Show this help
 
 [shell] is optional: bash, zsh, or ksh  (default: inherited from target)
 EOF
 }
 
-# Known plugins and their fly handles
-_hive_fly_handle()
-{
-    case "$1" in
-        flexed)    echo "f-atwi/flexed"    ;;
-        fujy)      echo "f-atwi/fujy"      ;;
-        swarmpass) echo "f-atwi/swarmpass" ;;
-        *)         return 1                ;;
-    esac
-}
-
-# ── Shared transport ─────────────────────────────────────────────
-
-_hive_transport_prepare()
-{
-    typeset tool
-
-    tool="$1"
-    : "${FLY_HOME:=$HOME}"
-    : "${FLY_TMPDIR:=/tmp}"
-    : "${FLY_TARZ:=-z}"
-    : "${_fly_lib:=$FLY_HOME/.fly.d/.fly.lib}"
-    : "${_fly_uuid:=$(cat "$FLY_HOME/.fly.d/.flyuuid" 2>/dev/null || uuidgen)}"
-
-    command -v "$tool" >/dev/null 2>&1 || {
-        echo "hive: $tool command not found" >&2
-        return 1
-    }
-    type _fly_pkg_warp >/dev/null 2>&1 || {
-        echo "hive: load Fly first (. ~/.fly.d/fly source)" >&2
-        return 1
-    }
-
-    _fly_tmpdir="$FLY_TMPDIR/.fly.$(id -u)/$_fly_uuid"
-    _fly_tarz="$FLY_TARZ"
-}
-
-_hive_run()
-{
-    typeset transport target stage_cmd attach_cmd
-
-    transport="$1"
-    target="$2"
-    [ "$target" ] || { echo "usage: hive $transport <target> [bash|zsh|ksh]" >&2; return 1; }
-
-    _hive_transport_prepare "$transport" || return $?
-
-    stage_cmd="$(_fly_xpretar);$(_fly_xpackage)"
-    attach_cmd="FLY_HOME=$_fly_tmpdir; . \"$_fly_tmpdir/.fly.d/.fly.lib/.loginshell\""
-
-    case "$transport" in
-        multipass)
-            _fly_package | multipass exec "$target" -- /bin/sh -c "$stage_cmd" || return $?
-            multipass exec "$target" -- /bin/sh -c "$attach_cmd"
-            ;;
-        ssh)
-            _fly_package | ssh "$target" "/bin/sh -c '$stage_cmd'" || return $?
-            ssh "$target" "/bin/sh -c '$attach_cmd'"
-            ;;
-    esac
-}
-
-# Delegate to a plugin-provided function; validates it is loaded and target is given.
-_hive_delegate()
-{
-    typeset fn plugin subcmd target
-
-    fn="$1" plugin="$2" subcmd="$3" target="$4"
-    type "$fn" >/dev/null 2>&1 || {
-        echo "hive: $plugin plugin not loaded ($subcmd requires $plugin)" >&2
-        return 1
-    }
-    [ "$target" ] || { echo "usage: hive $subcmd <target> [bash|zsh|ksh]" >&2; return 1; }
-    "$fn" "$target"
-}
-
-# ── Dispatcher ───────────────────────────────────────────────────
 
 hive()
 {
@@ -110,19 +37,8 @@ hive()
     [ "$shell" ] && _fly_destshell="$shell"
 
     case "$subcmd" in
-        lxc)       _hive_delegate flylxsh flexed lxc  "$target" ;;
-        juju)      _hive_delegate flyjssh fujy   juju "$target" ;;
-        multipass) _hive_run multipass "$target"                ;;
-        ssh)       _hive_run ssh       "$target"                ;;
-        add)
-            typeset plugin handle
-            plugin="$target"
-            [ "$plugin" ] || { echo "usage: hive add <plugin>" >&2; return 1; }
-            handle="$(_hive_fly_handle "$plugin")" || {
-                echo "hive: unknown plugin '$plugin'" >&2
-                return 1
-            }
-            fly add "$handle"
+        lxc|juju|multipass|ssh)
+            _fly_transport_run "$subcmd" "$target"
             ;;
         help|--help|-h)
             _hive_usage

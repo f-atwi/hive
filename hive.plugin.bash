@@ -1,9 +1,9 @@
 . "${BASH_SOURCE%/*}/hive"
 
-# Delegate to the owning plugin's helper — guaranteed loaded when the transport flag is set.
-_hive_lxc_targets()       { _flexed_containers; }
-_hive_juju_targets()      { _fujy_units; }
-_hive_multipass_targets() { _swarmpass_instances; }
+# Target list functions — hive owns all transports, query binaries directly.
+_hive_lxc_targets()       { lxc list --format csv 2>/dev/null | awk -F, '$1 != "" { print $1 }'; }
+_hive_juju_targets()      { juju status 2>/dev/null | awk '/^[a-z][a-z0-9-]*\/[0-9]/{gsub(/\*/, "", $1); print $1}'; }
+_hive_multipass_targets() { multipass list --format csv 2>/dev/null | awk -F, 'NR > 1 && $1 != "" { print $1 }'; }
 
 _hive_ssh_targets()
 {
@@ -11,22 +11,22 @@ _hive_ssh_targets()
         | awk '{for(i=2;i<=NF;i++) if($i !~ /[*?]/) print $i}'
 }
 
-# Only suggest subcommands whose backing plugin has been loaded.
+# Only suggest subcommands whose backing binary is present.
 _hive_active_subcmds()
 {
     local cmds=""
-    [ "$_flexed_loaded"    ] && cmds="$cmds lxc"
-    [ "$_fujy_loaded"      ] && cmds="$cmds juju"
-    [ "$_swarmpass_loaded" ] && cmds="$cmds multipass"
-    command -v ssh >/dev/null 2>&1 && cmds="$cmds ssh"
-    echo "$cmds add help"
+    command -v lxc       >/dev/null 2>&1 && cmds="$cmds lxc"
+    command -v juju      >/dev/null 2>&1 && cmds="$cmds juju"
+    command -v multipass >/dev/null 2>&1 && cmds="$cmds multipass"
+    command -v ssh       >/dev/null 2>&1 && cmds="$cmds ssh"
+    echo "$cmds"
 }
 
 # Suggest plugins that are known but not yet installed.
 _hive_available_plugins()
 {
     local plugin
-    for plugin in flexed fujy futil nerdp swarmpass; do
+    for plugin in hivecore flexed fujy futil nerdp swarmpass; do
         [ -d "${FLY_HOME:-$HOME}/.fly.d/plugins/$plugin" ] || echo "$plugin"
     done
 }
