@@ -13,9 +13,9 @@ usage: hive <subcommand> <target> [bash|zsh|ksh]
 
 Canonical infrastructure hub — unified Fly transports for LXD, Juju, and Multipass.
 
-  lxc       <container>  [shell]   Fly shell in an LXD container or VM  (requires flexed)
-  juju      <unit>       [shell]   Fly shell in a Juju unit             (requires fujy)
-  multipass <vm>         [shell]   Fly shell in a Multipass VM          (requires swarmpass)
+  lxc       <container/vm>  [shell]   Fly shell in an LXD container or VM   (requires f-atwi/flexed)
+  juju      <unit>       [shell]   Fly shell in a Juju unit                 (requires f-atwi/fujy)
+  multipass <vm>         [shell]   Fly shell in a Multipass VM              (requires f-atwi/swarmpass)
   ssh       <host>       [shell]   Fly shell over SSH
 
   help                            Show this help

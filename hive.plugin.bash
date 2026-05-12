@@ -11,14 +11,14 @@ _hive_ssh_targets()
         | awk '{for(i=2;i<=NF;i++) if($i !~ /[*?]/) print $i}'
 }
 
-# Only suggest subcommands whose backing binary is present.
+# Only suggest subcommands whose backing binary AND plugin are both present.
 _hive_active_subcmds()
 {
     local cmds=""
-    command -v lxc       >/dev/null 2>&1 && cmds="$cmds lxc"
-    command -v juju      >/dev/null 2>&1 && cmds="$cmds juju"
-    command -v multipass >/dev/null 2>&1 && cmds="$cmds multipass"
-    command -v ssh       >/dev/null 2>&1 && cmds="$cmds ssh"
+    [ "$_flexed_loaded"   ] && command -v lxc       >/dev/null 2>&1 && cmds="$cmds lxc"
+    [ "$_fujy_loaded"     ] && command -v juju      >/dev/null 2>&1 && cmds="$cmds juju"
+    [ "$_swarmpass_loaded" ] && command -v multipass >/dev/null 2>&1 && cmds="$cmds multipass"
+    command -v ssh >/dev/null 2>&1 && cmds="$cmds ssh"
     echo "$cmds"
 }
 
