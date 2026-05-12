@@ -26,7 +26,7 @@ _hive_active_subcmds()
 _hive_available_plugins()
 {
     local plugin
-    for plugin in hivecore flexed fujy futil nerdp swarmpass; do
+    for plugin in hive-core flexed fujy futil nerdp swarmpass; do
         [ -d "${FLY_HOME:-$HOME}/.fly.d/plugins/$plugin" ] || echo "$plugin"
     done
 }

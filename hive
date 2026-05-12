@@ -1,8 +1,8 @@
 [ "$_hive_loaded" ] && return 0
 _hive_loaded=1
 
-[ "$_hivecore_loaded" ] || {
-    echo "hive: hivecore plugin not loaded — run: fly add f-atwi/hivecore" >&2
+[ "$_hive-core_loaded" ] || {
+    echo "hive: hive-core plugin not loaded — run: fly add f-atwi/hive-core" >&2
     return 1
 }
 
