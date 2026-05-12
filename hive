@@ -1,37 +1,43 @@
 [ "$_hive_loaded" ] && return 0
 _hive_loaded=1
 
-[ "$_hive-core_loaded" ] || { _hive_core="${FLY_HOME:-$HOME}/.fly.d/plugins/hive-core/hive-core"; [ -f "$_hive_core" ] && . "$_hive_core" || { echo "hive: hive-core plugin not installed — run: fly add f-atwi/hive-core" >&2; return 1; }; unset _hive_core; }
+[ "$_hivecore_loaded" ] || { _hive_core="${FLY_HOME:-$HOME}/.fly.d/plugins/hive-core/hive-core"; [ -f "$_hive_core" ] && . "$_hive_core" || { echo "hive: hive-core plugin not installed — run: fly add f-atwi/hive-core" >&2; return 1; }; unset _hive_core; }
 
 _hive_usage()
 {
     cat - <<'EOF'
-usage: hive <subcommand> <target> [bash|zsh|ksh]
+usage: hive [-s bash|zsh|ksh] <subcommand> <target>
 
 Canonical infrastructure hub — unified Fly transports for LXD, Juju, and Multipass.
 
-  lxc       <container/vm>  [shell]   Fly shell in an LXD container or VM   (requires f-atwi/flexed)
-  juju      <unit>       [shell]   Fly shell in a Juju unit                 (requires f-atwi/fujy)
-  multipass <vm>         [shell]   Fly shell in a Multipass VM              (requires f-atwi/swarmpass)
-  ssh       <host>       [shell]   Fly shell over SSH
+  lxc       <container/vm>   Fly shell in an LXD container or VM   (requires f-atwi/flexed)
+  juju      <unit>           Fly shell in a Juju unit               (requires f-atwi/fujy)
+  multipass <vm>             Fly shell in a Multipass VM            (requires f-atwi/swarmpass)
+  ssh       <host>           Fly shell over SSH
 
-  help                            Show this help
+  help                       Show this help
 
-[shell] is optional: bash, zsh, or ksh  (default: inherited from target)
+Options:
+  -s, --shell <shell>        Shell to launch on target (bash, zsh, ksh; default: inherited)
 EOF
 }
 
 
 hive()
 {
-    typeset subcmd target shell
+    typeset subcmd target
+
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -s|--shell) _fly_destshell="$2"; shift 2 ;;
+            --shell=*)  _fly_destshell="${1#*=}"; shift ;;
+            *)          break ;;
+        esac
+    done
 
     subcmd="${1:-}"
     [ "$subcmd" ] || { _hive_usage; return 0; }
     target="${2:-}"
-    shell="${3:-}"
-
-    [ "$shell" ] && _fly_destshell="$shell"
 
     case "$subcmd" in
         lxc|juju|multipass|ssh)

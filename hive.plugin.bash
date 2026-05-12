@@ -33,43 +33,55 @@ _hive_available_plugins()
 
 _hive_completion()
 {
-    local cur subcmd
+    local cur subcmd prev
 
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
-    subcmd="${COMP_WORDS[1]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-    if [[ $COMP_CWORD -eq 1 ]]; then
-        COMPREPLY=($(compgen -W "$(_hive_active_subcmds)" -- "$cur"))
+    # After -s / --shell, complete shell names
+    if [[ "$prev" == "-s" || "$prev" == "--shell" ]]; then
+        COMPREPLY=($(compgen -W "bash zsh ksh" -- "$cur"))
+        return
+    fi
+    if [[ "$cur" == --shell=* ]]; then
+        COMPREPLY=($(compgen -W "--shell=bash --shell=zsh --shell=ksh" -- "$cur"))
         return
     fi
 
-    if [[ $COMP_CWORD -eq 2 ]]; then
-        case "$subcmd" in
-            lxc)
-                COMPREPLY=($(compgen -W "$(_hive_lxc_targets | tr '\n' ' ')" -- "$cur"))
-                ;;
-            juju)
-                COMPREPLY=($(compgen -W "$(_hive_juju_targets | tr '\n' ' ')" -- "$cur"))
-                ;;
-            multipass)
-                COMPREPLY=($(compgen -W "$(_hive_multipass_targets | tr '\n' ' ')" -- "$cur"))
-                ;;
-            ssh)
-                COMPREPLY=($(compgen -W "$(_hive_ssh_targets | tr '\n' ' ')" -- "$cur"))
-                ;;
-            add)
-                COMPREPLY=($(compgen -W "$(_hive_available_plugins | tr '\n' ' ')" -- "$cur"))
-                ;;
-        esac
+    # Find the real subcommand (skip -s/--shell flags and their values)
+    local i word skip=0
+    subcmd=""
+    for (( i=1; i<COMP_CWORD; i++ )); do
+        word="${COMP_WORDS[i]}"
+        if [[ $skip -eq 1 ]]; then skip=0; continue; fi
+        if [[ "$word" == "-s" || "$word" == "--shell" ]]; then skip=1; continue; fi
+        if [[ "$word" == --shell=* ]]; then continue; fi
+        if [[ -z "$subcmd" ]]; then subcmd="$word"; fi
+    done
+
+    if [[ -z "$subcmd" ]]; then
+        COMPREPLY=($(compgen -W "-s --shell $(_hive_active_subcmds)" -- "$cur"))
         return
     fi
 
-    if [[ $COMP_CWORD -eq 3 ]]; then
+    # Second positional (target)
+    local n_positional=0
+    for (( i=1; i<COMP_CWORD; i++ )); do
+        word="${COMP_WORDS[i]}"
+        if [[ $skip -eq 1 ]]; then skip=0; continue; fi
+        if [[ "$word" == "-s" || "$word" == "--shell" ]]; then skip=1; continue; fi
+        if [[ "$word" == --shell=* ]]; then continue; fi
+        (( n_positional++ ))
+    done
+
+    if [[ $n_positional -eq 1 ]]; then
         case "$subcmd" in
-            lxc|juju|multipass|ssh)
-                COMPREPLY=($(compgen -W "bash zsh ksh" -- "$cur"))
-                ;;
+            lxc)       COMPREPLY=($(compgen -W "$(_hive_lxc_targets | tr '\n' ' ')" -- "$cur")) ;;
+            juju)      COMPREPLY=($(compgen -W "$(_hive_juju_targets | tr '\n' ' ')" -- "$cur")) ;;
+            multipass) COMPREPLY=($(compgen -W "$(_hive_multipass_targets | tr '\n' ' ')" -- "$cur")) ;;
+            ssh)       COMPREPLY=($(compgen -W "$(_hive_ssh_targets | tr '\n' ' ')" -- "$cur")) ;;
+            add)       COMPREPLY=($(compgen -W "$(_hive_available_plugins | tr '\n' ' ')" -- "$cur")) ;;
         esac
     fi
 }
