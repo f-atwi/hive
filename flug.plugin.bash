@@ -1,18 +1,18 @@
-. "${BASH_SOURCE%/*}/hive"
+. "${BASH_SOURCE%/*}/flug"
 
-# Target list functions — hive owns all transports, query binaries directly.
-_hive_lxc_targets()       { lxc list --format csv 2>/dev/null | awk -F, '$1 != "" { print $1 }'; }
-_hive_juju_targets()      { juju status 2>/dev/null | awk '/^[a-z][a-z0-9-]*\/[0-9]/{gsub(/\*/, "", $1); print $1}'; }
-_hive_multipass_targets() { multipass list --format csv 2>/dev/null | awk -F, 'NR > 1 && $1 != "" { print $1 }'; }
+# Target list functions — flug owns all transports, query binaries directly.
+_flug_lxc_targets()       { lxc list --format csv 2>/dev/null | awk -F, '$1 != "" { print $1 }'; }
+_flug_juju_targets()      { juju status 2>/dev/null | awk '/^[a-z][a-z0-9-]*\/[0-9]/{gsub(/\*/, "", $1); print $1}'; }
+_flug_multipass_targets() { multipass list --format csv 2>/dev/null | awk -F, 'NR > 1 && $1 != "" { print $1 }'; }
 
-_hive_ssh_targets()
+_flug_ssh_targets()
 {
     grep -i '^Host ' ~/.ssh/config 2>/dev/null \
         | awk '{for(i=2;i<=NF;i++) if($i !~ /[*?]/) print $i}'
 }
 
 # Only suggest subcommands whose backing binary AND plugin are both present.
-_hive_active_subcmds()
+_flug_active_subcmds()
 {
     local cmds=""
     [ "$_flexed_loaded"   ] && command -v lxc       >/dev/null 2>&1 && cmds="$cmds lxc"
@@ -23,15 +23,15 @@ _hive_active_subcmds()
 }
 
 # Suggest plugins that are known but not yet installed.
-_hive_available_plugins()
+_flug_available_plugins()
 {
     local plugin
-    for plugin in hive-core flexed fujy futil nerdp swarmpass; do
+    for plugin in flug-core flexed fujy futil nerdp swarmpass; do
         [ -d "${FLY_HOME:-$HOME}/.fly.d/plugins/$plugin" ] || echo "$plugin"
     done
 }
 
-_hive_completion()
+_flug_completion()
 {
     local cur subcmd prev
 
@@ -61,7 +61,7 @@ _hive_completion()
     done
 
     if [[ -z "$subcmd" ]]; then
-        COMPREPLY=($(compgen -W "-s --shell $(_hive_active_subcmds)" -- "$cur"))
+        COMPREPLY=($(compgen -W "-s --shell $(_flug_active_subcmds)" -- "$cur"))
         return
     fi
 
@@ -77,13 +77,13 @@ _hive_completion()
 
     if [[ $n_positional -eq 1 ]]; then
         case "$subcmd" in
-            lxc)       COMPREPLY=($(compgen -W "$(_hive_lxc_targets | tr '\n' ' ')" -- "$cur")) ;;
-            juju)      COMPREPLY=($(compgen -W "$(_hive_juju_targets | tr '\n' ' ')" -- "$cur")) ;;
-            multipass) COMPREPLY=($(compgen -W "$(_hive_multipass_targets | tr '\n' ' ')" -- "$cur")) ;;
-            ssh)       COMPREPLY=($(compgen -W "$(_hive_ssh_targets | tr '\n' ' ')" -- "$cur")) ;;
-            add)       COMPREPLY=($(compgen -W "$(_hive_available_plugins | tr '\n' ' ')" -- "$cur")) ;;
+            lxc)       COMPREPLY=($(compgen -W "$(_flug_lxc_targets | tr '\n' ' ')" -- "$cur")) ;;
+            juju)      COMPREPLY=($(compgen -W "$(_flug_juju_targets | tr '\n' ' ')" -- "$cur")) ;;
+            multipass) COMPREPLY=($(compgen -W "$(_flug_multipass_targets | tr '\n' ' ')" -- "$cur")) ;;
+            ssh)       COMPREPLY=($(compgen -W "$(_flug_ssh_targets | tr '\n' ' ')" -- "$cur")) ;;
+            add)       COMPREPLY=($(compgen -W "$(_flug_available_plugins | tr '\n' ' ')" -- "$cur")) ;;
         esac
     fi
 }
 
-complete -F _hive_completion hive
+complete -F _flug_completion flug

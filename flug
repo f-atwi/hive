@@ -1,12 +1,12 @@
-[ "$_hive_loaded" ] && return 0
-_hive_loaded=1
+[ "$_flug_loaded" ] && return 0
+_flug_loaded=1
 
-[ "$_hivecore_loaded" ] || { _hive_core="${FLY_HOME:-$HOME}/.fly.d/plugins/hive-core/hive-core"; [ -f "$_hive_core" ] && . "$_hive_core" || { echo "hive: hive-core plugin not installed — run: fly add f-atwi/hive-core" >&2; return 1; }; unset _hive_core; }
+[ "$_flugcore_loaded" ] || { _flug_core="${FLY_HOME:-$HOME}/.fly.d/plugins/flug-core/flug-core"; [ -f "$_flug_core" ] && . "$_flug_core" || { echo "flug: flug-core plugin not installed — run: fly add f-atwi/flug-core" >&2; return 1; }; unset _flug_core; }
 
-_hive_usage()
+_flug_usage()
 {
     cat - <<'EOF'
-usage: hive [-s bash|zsh|ksh] <subcommand> <target>
+usage: flug [-s bash|zsh|ksh] <subcommand> <target>
 
 Canonical infrastructure hub — unified Fly transports for LXD, Juju, and Multipass.
 
@@ -23,7 +23,7 @@ EOF
 }
 
 
-hive()
+flug()
 {
     typeset subcmd target
 
@@ -36,7 +36,7 @@ hive()
     done
 
     subcmd="${1:-}"
-    [ "$subcmd" ] || { _hive_usage; return 0; }
+    [ "$subcmd" ] || { _flug_usage; return 0; }
     target="${2:-}"
 
     case "$subcmd" in
@@ -44,11 +44,11 @@ hive()
             _fly_transport_run "$subcmd" "$target"
             ;;
         help|--help|-h)
-            _hive_usage
+            _flug_usage
             ;;
         *)
-            echo "hive: unknown subcommand '$subcmd'" >&2
-            _hive_usage >&2
+            echo "flug: unknown subcommand '$subcmd'" >&2
+            _flug_usage >&2
             return 1
             ;;
     esac
