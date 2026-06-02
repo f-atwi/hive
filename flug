@@ -1,24 +1,121 @@
-[ "$_flug_loaded" ] && return 0
-_flug_loaded=1
+# ── Fly transport primitives ──────────────────────────────────────
 
-[ "$_flugcore_loaded" ] || { _flug_core="${FLY_HOME:-$HOME}/.fly.d/plugins/flug-core/flug-core"; [ -f "$_flug_core" ] && . "$_flug_core" || { echo "flug: flug-core plugin not installed — run: fly add f-atwi/flug-core" >&2; return 1; }; unset _flug_core; }
+_fly_transport_prepare()
+{
+    typeset tool
+
+    tool="$1"
+    : "${FLY_HOME:=$HOME}"
+    : "${FLY_TMPDIR:=/tmp}"
+    : "${FLY_TARZ:=-z}"
+    : "${_fly_lib:=$FLY_HOME/.fly.d/.fly.lib}"
+    : "${_fly_uuid:=$(cat "$FLY_HOME/.fly.d/.flyuuid" 2>/dev/null || uuidgen)}"
+
+    command -v "$tool" >/dev/null 2>&1 || {
+        echo "flug: $tool command not found" >&2
+        return 1
+    }
+    type _fly_pkg_warp >/dev/null 2>&1 || {
+        echo "flug: load Fly first (. ~/.fly.d/fly source)" >&2
+        return 1
+    }
+
+    _fly_tmpdir="$FLY_TMPDIR/.fly.$(id -u)/$_fly_uuid"
+    _fly_tarz="$FLY_TARZ"
+}
+
+_fly_transport_stage()
+{
+    typeset transport target stage_cmd
+
+    transport="$1"
+    target="$2"
+    stage_cmd="$(_fly_xpretar);$(_fly_xpackage)"
+
+    case "$transport" in
+        lxc)       _fly_package | lxc exec "$target" -- /bin/sh -c "$stage_cmd" ;;
+        multipass) _fly_package | multipass exec "$target" -- /bin/sh -c "$stage_cmd" ;;
+        juju)      _fly_package | juju ssh "$target" "/bin/sh -c '$stage_cmd'" ;;
+        ssh)       _fly_package | ssh -o ConnectTimeout=10 "$target" "/bin/sh -c '$stage_cmd'" ;;
+    esac
+}
+
+_fly_transport_attach()
+{
+    typeset transport target attach_cmd
+
+    transport="$1"
+    target="$2"
+
+    case "$transport" in
+        juju)
+            attach_cmd="export USER=\$(id -un); export _fujy_juju_cwd=/var/lib/juju; _fly_destshell=\"$_fly_destshell\"; FLY_ETC_RC=\"${FLY_ETC_RC:-true}\"; FLY_USER_RC=\"${FLY_USER_RC:-true}\"; FLY_HOME=$_fly_tmpdir; . \"$_fly_tmpdir/.fly.d/.fly.lib/.loginshell\""
+            juju ssh "$target" "/bin/sh -c '$attach_cmd'"
+            ;;
+        *)
+            attach_cmd="_fly_destshell=\"$_fly_destshell\"; FLY_ETC_RC=\"${FLY_ETC_RC:-true}\"; FLY_USER_RC=\"${FLY_USER_RC:-true}\"; FLY_HOME=$_fly_tmpdir; . \"$_fly_tmpdir/.fly.d/.fly.lib/.loginshell\""
+            case "$transport" in
+                lxc)       lxc exec "$target" -- /bin/sh -c "$attach_cmd" ;;
+                multipass) multipass exec "$target" -- /bin/sh -c "$attach_cmd" ;;
+                ssh)       ssh -t -o ConnectTimeout=10 "$target" "/bin/sh -c '$attach_cmd'" ;;
+            esac
+            ;;
+    esac
+}
+
+_fly_transport_run()
+{
+    typeset transport target
+
+    transport="$1"
+    target="$2"
+    [ "$target" ] || { echo "usage: ... $transport <target> [bash|zsh|ksh]" >&2; return 1; }
+
+    _fly_transport_prepare "$transport" || return $?
+    _fly_transport_stage   "$transport" "$target" || return $?
+    _fly_transport_attach  "$transport" "$target"
+}
+
+# ── Target list functions (used by shell-specific completion) ─────
+_flug_lxc_targets()       { lxc list --format csv 2>/dev/null | awk -F, '$1 != "" { print $1 }'; }
+_flug_juju_targets()      { juju status 2>/dev/null | awk '/^[a-z][a-z0-9-]*\/[0-9]/{gsub(/\*/, "", $1); print $1}'; }
+_flug_multipass_targets() { multipass list --format csv 2>/dev/null | awk -F, 'NR > 1 && $1 != "" { print $1 }'; }
+
+_flug_ssh_targets()
+{
+    grep -i '^Host ' ~/.ssh/config 2>/dev/null \
+        | awk '{for(i=2;i<=NF;i++) if($i !~ /[*?]/) print $i}'
+}
+
+# Only suggests subcommands whose backing binary is present.
+_flug_active_subcmds()
+{
+    typeset cmds=""
+    command -v lxc       >/dev/null 2>&1 && cmds="$cmds lxc"
+    command -v juju      >/dev/null 2>&1 && cmds="$cmds juju"
+    command -v multipass >/dev/null 2>&1 && cmds="$cmds multipass"
+    command -v ssh       >/dev/null 2>&1 && cmds="$cmds ssh"
+    echo "$cmds"
+}
+
+# ── flug command ──────────────────────────────────────────────────
 
 _flug_usage()
 {
     cat - <<'EOF'
-usage: flug [-s bash|zsh|ksh] <subcommand> <target>
+usage: flug [bash|zsh|ksh] <subcommand> <target>
 
 Canonical infrastructure hub — unified Fly transports for LXD, Juju, and Multipass.
 
-  lxc       <container/vm>   Fly shell in an LXD container or VM   (requires f-atwi/flexed)
-  juju      <unit>           Fly shell in a Juju unit               (requires f-atwi/fujy)
-  multipass <vm>             Fly shell in a Multipass VM            (requires f-atwi/swarmpass)
+  lxc       <container/vm>   Fly shell in an LXD container or VM
+  juju      <unit>           Fly shell in a Juju unit
+  multipass <vm>             Fly shell in a Multipass VM
   ssh       <host>           Fly shell over SSH
 
   help                       Show this help
 
-Options:
-  -s, --shell <shell>        Shell to launch on target (bash, zsh, ksh; default: inherited)
+Arguments:
+  bash|zsh|ksh               Shell to launch on target (optional; default: inherited)
 EOF
 }
 
@@ -27,13 +124,10 @@ flug()
 {
     typeset subcmd target
 
-    while [ $# -gt 0 ]; do
-        case "$1" in
-            -s|--shell) _fly_destshell="$2"; shift 2 ;;
-            --shell=*)  _fly_destshell="${1#*=}"; shift ;;
-            *)          break ;;
-        esac
-    done
+    # Optional shell as first positional argument
+    case "${1:-}" in
+        bash|zsh|ksh) _fly_destshell="$1"; shift ;;
+    esac
 
     subcmd="${1:-}"
     [ "$subcmd" ] || { _flug_usage; return 0; }
