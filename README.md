@@ -16,9 +16,8 @@ infrastructure types:
 * open a Fly environment in a **Juju** unit with `flug juju <unit>`
 * open a Fly environment in a **Multipass** VM with `flug multipass <vm>`
 * open a Fly environment over **SSH** with `flug ssh <host>`
-* force destination shell with `-s bash|zsh|ksh`
+* force destination shell with an optional leading `bash|zsh|ksh` argument
 * tab-completion for subcommands **and** for targets (containers / units / VMs)
-* convenience aliases: `flylxcshell`, `flyjujushell`, `flympshell` (and `b`/`z`/`k` variants)
 
 ## prerequisites
 
@@ -38,16 +37,16 @@ fly add f-atwi/flug
 ## Usage
 
 ```shell
-flug [-s bash|zsh|ksh] <subcommand> <target>
+flug [bash|zsh|ksh] <subcommand> <target>
 ```
 
 ### LXD
 
 ```shell
 flug lxc my-container          # open fly shell in container
-flug -s bash lxc my-container  # force bash as destination
-flug -s zsh  lxc my-container  # force zsh  as destination
-flug -s ksh  lxc my-container  # force ksh  as destination
+flug bash lxc my-container     # force bash as destination
+flug zsh  lxc my-container     # force zsh  as destination
+flug ksh  lxc my-container     # force ksh  as destination
 ```
 
 ### Juju
@@ -55,21 +54,21 @@ flug -s ksh  lxc my-container  # force ksh  as destination
 ```shell
 flug juju ubuntu/0             # open fly shell in unit
 flug juju ubuntu/leader        # leader unit shorthand
-flug -s bash juju ubuntu/0     # force bash as destination
+flug bash juju ubuntu/0        # force bash as destination
 ```
 
 ### Multipass
 
 ```shell
 flug multipass primary          # open fly shell in VM
-flug -s bash multipass primary  # force bash as destination
+flug bash multipass primary     # force bash as destination
 ```
 
 ### SSH
 
 ```shell
 flug ssh my-host
-flug -s zsh ssh my-host
+flug zsh ssh my-host
 ```
 
 ### Help
@@ -81,16 +80,13 @@ flug
 
 ## Tab-completion
 
-Completion is available in **bash**.
+Completion is available in **bash**, **zsh**, and **ksh** (ksh via a `KEYBD` trap).
 
-* `flug <TAB>` — lists available subcommands (only those whose binary is present)
+* `flug <TAB>` — lists shell names and available subcommands (only those whose binary is present)
 * `flug lxc <TAB>` — lists LXD containers and VMs (`lxc list`)
 * `flug juju <TAB>` — lists Juju units (`juju status`)
 * `flug multipass <TAB>` — lists Multipass VMs (`multipass list`)
 * `flug ssh <TAB>` — lists hosts from `~/.ssh/config`
-* `flug -s <TAB>` — lists shell names
-
-Tab-completion is also registered for all convenience alias variants.
 
 ## Notes
 
