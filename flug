@@ -98,6 +98,36 @@ _flug_active_subcmds()
     echo "$cmds"
 }
 
+# Completion candidates for the next argument, given the already-typed args
+# after `flug` (excluding the current partial word). Empty once a target is set.
+_flug_complist()
+{
+    typeset w shell="" subcmd="" have_target=0
+    for w in "$@"; do
+        if [ -n "$subcmd" ]; then
+            have_target=1
+            continue
+        fi
+        case "$w" in
+            bash|zsh|ksh)                 [ -z "$shell" ] && shell="$w" ;;
+            lxc|juju|multipass|ssh|help)  subcmd="$w" ;;
+        esac
+    done
+    [ "$have_target" = 1 ] && return
+
+    if [ -z "$subcmd" ]; then
+        [ -z "$shell" ] && printf 'bash zsh ksh '
+        printf '%s help\n' "$(_flug_active_subcmds)"
+        return
+    fi
+    case "$subcmd" in
+        lxc)       _flug_lxc_targets ;;
+        juju)      _flug_juju_targets ;;
+        multipass) _flug_multipass_targets ;;
+        ssh)       _flug_ssh_targets ;;
+    esac
+}
+
 # ── flug command ──────────────────────────────────────────────────
 
 _flug_usage()
