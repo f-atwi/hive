@@ -33,7 +33,13 @@ _fly_transport_stage()
     stage_cmd="$(_fly_xpretar);$(_fly_xpackage)"
 
     case "$transport" in
-        lxc)       _fly_package | lxc --project "$_flug_lxc_project" exec "$target" -- /bin/sh -c "$stage_cmd" ;;
+        lxc)
+            if [ -n "$_flug_lxc_project" ]; then
+                _fly_package | lxc --project "$_flug_lxc_project" exec "$target" -- /bin/sh -c "$stage_cmd"
+            else
+                _fly_package | lxc exec "$target" -- /bin/sh -c "$stage_cmd"
+            fi
+            ;;
         multipass) _fly_package | multipass exec "$target" -- /bin/sh -c "$stage_cmd" ;;
         juju)      _fly_package | juju ssh "$target" "/bin/sh -c '$stage_cmd'" ;;
         ssh)       _fly_package | ssh -o ConnectTimeout=10 "$target" "/bin/sh -c '$stage_cmd'" ;;
@@ -55,7 +61,13 @@ _fly_transport_attach()
         *)
             attach_cmd="_fly_destshell=\"$_fly_destshell\"; FLY_ETC_RC=\"${FLY_ETC_RC:-true}\"; FLY_USER_RC=\"${FLY_USER_RC:-true}\"; FLY_HOME=$_fly_tmpdir; . \"$_fly_tmpdir/.fly.d/.fly.lib/.loginshell\""
             case "$transport" in
-                lxc)       lxc --project "$_flug_lxc_project" exec "$target" -- /bin/sh -c "$attach_cmd" ;;
+                lxc)
+                    if [ -n "$_flug_lxc_project" ]; then
+                        lxc --project "$_flug_lxc_project" exec "$target" -- /bin/sh -c "$attach_cmd"
+                    else
+                        lxc exec "$target" -- /bin/sh -c "$attach_cmd"
+                    fi
+                    ;;
                 multipass) multipass exec "$target" -- /bin/sh -c "$attach_cmd" ;;
                 ssh)       ssh -t -o ConnectTimeout=10 "$target" "/bin/sh -c '$attach_cmd'" ;;
             esac
@@ -77,7 +89,15 @@ _fly_transport_run()
 }
 
 # ── Target list functions (used by shell-specific completion) ─────
-_flug_lxc_targets()       { lxc list --columns n --format csv 2>/dev/null | awk 'NF'; }
+_flug_lxc_targets()
+{
+    if [ -n "${1:-}" ]; then
+        lxc list --project "$1" --columns n --format csv 2>/dev/null | awk 'NF'
+    else
+        lxc list --columns n --format csv 2>/dev/null | awk 'NF'
+    fi
+}
+_flug_lxc_projects()      { lxc project list --format csv 2>/dev/null | awk -F, 'NF { sub(/ .*/, "", $1); print $1 }'; }
 _flug_juju_targets()      { juju status 2>/dev/null | awk '/^[a-z][a-z0-9-]*\/[0-9]/{gsub(/\*/, "", $1); print $1}'; }
 _flug_multipass_targets() { multipass list --format csv 2>/dev/null | awk -F, 'NR > 1 && $1 != "" { print $1 }'; }
 
@@ -102,16 +122,25 @@ _flug_active_subcmds()
 # after `flug` (excluding the current partial word). Empty once a target is set.
 _flug_complist()
 {
-    typeset w shell="" subcmd="" have_target=0
+    typeset w shell="" subcmd="" lxc_project="" have_target=0 expect_project=0
+
     for w in "$@"; do
-        if [ -n "$subcmd" ]; then
+        if [ -z "$subcmd" ]; then
+            case "$w" in
+                bash|zsh|ksh)                 [ -z "$shell" ] && shell="$w" ;;
+                lxc|juju|multipass|ssh|help)  subcmd="$w" ;;
+            esac
+        elif [ "$subcmd" = "lxc" ]; then
+            if [ "$expect_project" = 1 ]; then
+                lxc_project="$w"; expect_project=0
+            elif [ "$w" = "--project" ]; then
+                expect_project=1
+            else
+                have_target=1
+            fi
+        else
             have_target=1
-            continue
         fi
-        case "$w" in
-            bash|zsh|ksh)                 [ -z "$shell" ] && shell="$w" ;;
-            lxc|juju|multipass|ssh|help)  subcmd="$w" ;;
-        esac
     done
     [ "$have_target" = 1 ] && return
 
@@ -121,7 +150,14 @@ _flug_complist()
         return
     fi
     case "$subcmd" in
-        lxc)       _flug_lxc_targets ;;
+        lxc)
+            if [ "$expect_project" = 1 ]; then
+                _flug_lxc_projects
+            else
+                [ -z "$lxc_project" ] && printf -- '--project '
+                _flug_lxc_targets "$lxc_project"
+            fi
+            ;;
         juju)      _flug_juju_targets ;;
         multipass) _flug_multipass_targets ;;
         ssh)       _flug_ssh_targets ;;
@@ -163,7 +199,7 @@ flug()
     [ "$subcmd" ] || { _flug_usage; return 0; }
     shift
 
-    _flug_lxc_project="default"
+    _flug_lxc_project=""
     if [ "$subcmd" = "lxc" ] && [ "${1:-}" = "--project" ]; then
         _flug_lxc_project="${2:-}"
         shift 2
