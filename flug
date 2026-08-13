@@ -33,7 +33,7 @@ _fly_transport_stage()
     stage_cmd="$(_fly_xpretar);$(_fly_xpackage)"
 
     case "$transport" in
-        lxc)       _fly_package | lxc exec "$target" -- /bin/sh -c "$stage_cmd" ;;
+        lxc)       _fly_package | lxc --project "$_flug_lxc_project" exec "$target" -- /bin/sh -c "$stage_cmd" ;;
         multipass) _fly_package | multipass exec "$target" -- /bin/sh -c "$stage_cmd" ;;
         juju)      _fly_package | juju ssh "$target" "/bin/sh -c '$stage_cmd'" ;;
         ssh)       _fly_package | ssh -o ConnectTimeout=10 "$target" "/bin/sh -c '$stage_cmd'" ;;
@@ -55,7 +55,7 @@ _fly_transport_attach()
         *)
             attach_cmd="_fly_destshell=\"$_fly_destshell\"; FLY_ETC_RC=\"${FLY_ETC_RC:-true}\"; FLY_USER_RC=\"${FLY_USER_RC:-true}\"; FLY_HOME=$_fly_tmpdir; . \"$_fly_tmpdir/.fly.d/.fly.lib/.loginshell\""
             case "$transport" in
-                lxc)       lxc exec "$target" -- /bin/sh -c "$attach_cmd" ;;
+                lxc)       lxc --project "$_flug_lxc_project" exec "$target" -- /bin/sh -c "$attach_cmd" ;;
                 multipass) multipass exec "$target" -- /bin/sh -c "$attach_cmd" ;;
                 ssh)       ssh -t -o ConnectTimeout=10 "$target" "/bin/sh -c '$attach_cmd'" ;;
             esac
@@ -77,7 +77,7 @@ _fly_transport_run()
 }
 
 # ── Target list functions (used by shell-specific completion) ─────
-_flug_lxc_targets()       { lxc list --format csv 2>/dev/null | awk -F, '$1 != "" { print $1 }'; }
+_flug_lxc_targets()       { lxc list --columns n --format csv 2>/dev/null | awk 'NF'; }
 _flug_juju_targets()      { juju status 2>/dev/null | awk '/^[a-z][a-z0-9-]*\/[0-9]/{gsub(/\*/, "", $1); print $1}'; }
 _flug_multipass_targets() { multipass list --format csv 2>/dev/null | awk -F, 'NR > 1 && $1 != "" { print $1 }'; }
 
@@ -137,10 +137,10 @@ usage: flug [bash|zsh|ksh] <subcommand> <target>
 
 Canonical infrastructure hub — unified Fly transports for LXD, Juju, and Multipass.
 
-  lxc       <container/vm>   Fly shell in an LXD container or VM
-  juju      <unit>           Fly shell in a Juju unit
-  multipass <vm>             Fly shell in a Multipass VM
-  ssh       <host>           Fly shell over SSH
+  lxc       [--project <project>] <container/vm>    Fly shell in an LXD container or VM
+  juju      <unit>                                  Fly shell in a Juju unit
+  multipass <vm>                                    Fly shell in a Multipass VM
+  ssh       <host>                                  Fly shell over SSH
 
   help                       Show this help
 
@@ -161,7 +161,15 @@ flug()
 
     subcmd="${1:-}"
     [ "$subcmd" ] || { _flug_usage; return 0; }
-    target="${2:-}"
+    shift
+
+    _flug_lxc_project="default"
+    if [ "$subcmd" = "lxc" ] && [ "${1:-}" = "--project" ]; then
+        _flug_lxc_project="${2:-}"
+        shift 2
+    fi
+
+    target="${1:-}"
 
     case "$subcmd" in
         lxc|juju|multipass|ssh)
